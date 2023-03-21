@@ -1,0 +1,128 @@
+name: Creed.WebApi Auto Deployment
+
+# When this action will be executed
+on:
+  # Automatically trigger it when detected changes in repo
+  # push:
+  #   branches:
+  #     - master
+  #     - develop
+  #   paths:
+  #     - '**'
+  #     - '.github/workflows/server-deployment.yml'
+  # Allow mannually trigger
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+      - run: npm install
+      - run: npm run build --if-present
+      - run: npm run test
+
+  build-image-dev:
+    runs-on: ubuntu-latest
+    needs: test
+
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - name: Checkout to the branch
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to container registry
+        uses: docker/login-action@v1
+        with:
+          registry: creeddevacr.azurecr.io
+          username: ${{ secrets.AZURE_SP_CLIENT_ID }}
+          password: ${{ secrets.AZURE_SP_CLIENT_SECRET }}
+      
+      - name: Build and push container image to registry
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: creeddevacr.azurecr.io/creed-server-dev-image:latest
+          file: ./Dockerfile
+          context: ./
+
+  build-image-prod:
+    runs-on: ubuntu-latest
+    needs: test
+
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Checkout to the branch
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to container registry
+        uses: docker/login-action@v1
+        with:
+          registry: creedprodacr.azurecr.io
+          username: ${{ secrets.AZURE_SP_CLIENT_ID }}
+          password: ${{ secrets.AZURE_SP_CLIENT_SECRET }}
+      
+      - name: Build and push container image to registry
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: creedprodacr.azurecr.io/creed-server-prod-image:latest
+          file: ./Dockerfile
+          context: ./
+
+  deploy-dev:
+    runs-on: ubuntu-latest
+    needs:
+      - build-image-dev
+
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.CREED_AZURE_SP_CREDENTIALS }}
+
+      # az containerapp revision restart - is needed when new image has the same tag
+      # (currently tag is always set to be "latest")
+      # az containerapp revision restart --revision "creed-server-dev-ca--revision" --resource-group "creed-training-rg"
+      - name: Deploy to containerapp
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az config set extension.use_dynamic_install=yes_without_prompt
+            az containerapp registry set -n creed-server-dev-ca -g creed-training-rg --server creeddevacr.azurecr.io --username  ${{ secrets.AZURE_SP_CLIENT_ID }} --password ${{ secrets.AZURE_SP_CLIENT_SECRET }}
+            az containerapp update -n creed-server-dev-ca -g creed-training-rg --image creeddevacr.azurecr.io/creed-server-dev-image:latest
+
+  deploy-prod:
+    runs-on: ubuntu-latest
+    needs:
+      - build-image-prod
+
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.CREED_AZURE_SP_CREDENTIALS }}
+
+      # az containerapp revision restart - is needed when new image has the same tag
+      # (currently tag is always set to be "latest")
+      # az containerapp revision restart --revision "creed-server-prod-ca--revision" --resource-group "creed-training-rg"
+      - name: Deploy to containerapp
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az config set extension.use_dynamic_install=yes_without_prompt
+            az containerapp registry set -n creed-server-prod-ca -g creed-training-rg --server creedprodacr.azurecr.io --username  ${{ secrets.AZURE_SP_CLIENT_ID }} --password ${{ secrets.AZURE_SP_CLIENT_SECRET }}
+            az containerapp update -n creed-server-prod-ca -g creed-training-rg --image creedprodacr.azurecr.io/creed-server-prod-image:latest
