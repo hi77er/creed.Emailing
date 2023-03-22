@@ -1,8 +1,9 @@
 import { PORT } from "./keys";
 import app from "./app";
+// import { connectMongoDb } from "./services/mongodb";
 
 // Configure mongodb connection
-// import "./services/mongodb";
+// connectMongoDb();
 
 const listenningOn = PORT || 80;
 app.listen(listenningOn, () => {

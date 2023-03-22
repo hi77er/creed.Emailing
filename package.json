@@ -5,13 +5,13 @@
   "main": "index.js",
   "scripts": {
     "client": "npm --prefix ../creed.Client/ run start",
-    "start": "node index.js",
+    "start": "tsc -b -v && node ./out/index.js",
     "build": "tsc -b -v",
     "test": "jest --no-cache",
-    "service": "nodemon index.js",
+    "service": "nodemon ./out/index.js",
     "docker:build": "tsc -b -v && docker build . --tag kdkrastev89/creed-emailing:latest",
-    "docker:run": "tsc -b -v && docker build . --tag kdkrastev89/creed-emailing:latest && docker run --env PORT=80 --env MONGO_DB_CONNECTION_STRING=mongodb://connectionstringhere --env CORS_WHITELISTED_DOMAINS=http://localhost:3000 kdkrastev89/creed-emailing:latest",
-    "docker:push": "tsc -b -v && docker push kdkrastev89/creed-emailing:latest"
+    "docker:run": "tsc -b -v && docker build . --tag kdkrastev89/creed-emailing:latest && docker run --env PORT=80 --env MONGO_DB_CONNECTION_STRING=mongodb://creed-emailing-mongo-service:27017/creed-emailing-mongodb --env CORS_WHITELISTED_DOMAINS=http://localhost:3000 kdkrastev89/creed-emailing:latest",
+    "docker:push": "tsc -b -v && docker build . --tag kdkrastev89/creed-emailing:latest && docker push kdkrastev89/creed-emailing:latest"
   },
   "keywords": [],
   "author": "",

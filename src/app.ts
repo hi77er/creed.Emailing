@@ -8,6 +8,7 @@ import {
 } from './keys';
 import { errorHandler } from "./middlewares";
 import emailRouter from "./routes/emailRoutes";
+import healthRouter from "./routes/healthRoutes";
 
 // Configure App
 const app = express();
@@ -34,5 +35,6 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/email", emailRouter);
+app.use("/health", healthRouter);
 
 export default app;
